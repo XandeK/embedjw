@@ -19,7 +19,7 @@
 #define PI2		( (double)2 * PI )
 // Labels for the pie chart segments
 #define LABELS_COUNT 5 // Number of labels to display
-
+#define MAX_TIMES 1500
 // Label texts for each side
 const char *labels[LABELS_COUNT] = {
     "A",
@@ -237,9 +237,15 @@ int main()
             while (true)
                 ;
         }
-        ret = f_printf(&fil, "01:23 Button pressed!\n");
+        ret = f_printf(&fil, "01:2%d Button pressed!\n",data[i]);
+        
     }
-
+        ret = f_printf(&fil, "01:21 Button pressed!\n");
+        ret = f_printf(&fil, "01:21 Button pressed!\n");
+        ret = f_printf(&fil, "01:21 Button pressed!\n");
+        ret = f_printf(&fil, "01:22 Button pressed!\n");
+        ret = f_printf(&fil, "10:23 Button pressed!\n");
+        ret = f_printf(&fil, "10:23 Button pressed!\n");
     ezd_save(hDib, "output.bmp");
     
     // Close file
@@ -261,16 +267,62 @@ int main()
         while (true)
             ;
     }
-
+    // Use the top 5 counts as barData
+    int barData[MAX_TIMES];
+    int barDataCount = 0;
+    int datacount=0;
+    #define TIME_LENGTH 5   
     // Print every line in file over serial
     printf("Reading from file '%s':\r\n", filename);
     printf("---\r\n");
     while (f_gets(buf, sizeof(buf), &fil))
     {
         printf(buf);
+        // Extract the time from the line and convert it to an integer
+        int hours, minutes;
+        if (sscanf(buf, "%2d:%2d", &hours, &minutes) == 2) {
+            // Assuming the time is in the format xx:xx
+            int totalMinutes = hours * 60 + minutes;
+            barData[barDataCount++] = totalMinutes;
+            datacount++;
+        }
     }
     printf("\r\n---\r\n");
+    int timeCounts[MAX_TIMES] = {0};
+    
+    // Print the extracted time data for debugging
+    printf("Extracted Time Data:\n");
+    for (int i = 0; i < barDataCount; ++i) {
+        printf("%d \n", barData[i]);
+        if (barData[i] >= 0 && barData[i] < MAX_TIMES) {
+            timeCounts[barData[i]]++;
+        }
+        printf("%d \n", timeCounts[barData[i]]);
+        
+    }
+    printf("\n");
+    int showBardata[4]={0};
+    // Find and print the top 5 counts and their respective barData
+    printf("\nTop 5 Counts and BarData:\n");
+    for (int count = 0; count < 5; ++count) {
+        int maxCount = 0;
+        int maxIndex = 0;
 
+        for (int i = 0; i < MAX_TIMES; ++i) {
+            if (timeCounts[i] > maxCount) {
+                maxCount = timeCounts[i];
+                maxIndex = i;
+            }
+        }
+
+        if (maxCount > 0) {
+            printf("Count: %d, BarData: %d\n", maxCount, maxIndex);
+            timeCounts[maxIndex] = 0; // Mark this count as processed
+            showBardata[count]=maxCount;
+            
+        }
+    }
+    
     // Close file
     fr = f_close(&fil);
     if (fr != FR_OK)
@@ -280,8 +332,9 @@ int main()
             ;
     }
     // Draw the bar graph using the bar_graph function
-    int barData[] = {10, 20, 30, 40, 50}; // Example bar graph data
-    int barDataCount = sizeof(barData) / sizeof(barData[0]);
+   // int barData[] = {10, 20, 30, 40, 50}; // Example bar graph data
+   // int barDataCount = sizeof(barData) / sizeof(barData[0]);
+
     int barColors[] = {0xFFFFFF,0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00, 0xF403FC}; // Example bar colors
     ezd_rect( hDib, 35, 295, 605, 445, barColors[ 0 ] );
     int barGraphX1 = 10;
@@ -296,7 +349,7 @@ int main()
     }
 
     ezd_fill(hBarDib, 0x000000);
-    bar_graph(hBarDib, barGraphX1, barGraphY1, barGraphX2, barGraphY2, EZD_TYPE_INT, barData, barDataCount, barColors, sizeof(barColors) / sizeof(barColors[0]));
+    bar_graph(hBarDib, barGraphX1, barGraphY1, barGraphX2, barGraphY2, EZD_TYPE_INT, showBardata, 5, barColors, sizeof(barColors) / sizeof(barColors[0]));
 
     // Save the bar graph image
     ezd_save(hBarDib, "bar_graph.bmp");
